@@ -96,7 +96,8 @@
         });
 
         let counter = questions.length > 0 ? Math.max(...questions.map(q => q.id)) + 1 : 1;
-
+        // Memoria global para guardar los IDs de las preguntas seleccionadas
+        let selectedIds = new Set();
         function initThemes() {
             const select = document.getElementById('themeSelect');
             const currentFilter = select.value;
@@ -110,24 +111,22 @@
             if (themes.includes(currentFilter)) select.value = currentFilter;
         }
 
-        function render() {
+    function render() {
             const list = document.getElementById('list');
             const filter = document.getElementById('themeSelect').value;
-            
-            // Mantener estado de los checkboxes
-            const checkedStates = new Set();
-            document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                checkedStates.add(parseInt(cb.dataset.id));
-            });
 
             list.innerHTML = '';
             questions.forEach(q => {
                 if(filter !== 'all' && q.theme !== filter) return;
-                const isChecked = checkedStates.has(q.id) ? 'checked' : '';
+                
+                // Comprobamos si el ID está en nuestra memoria global
+                const isChecked = selectedIds.has(q.id) ? 'checked' : '';
+                
                 const div = document.createElement('div');
                 div.className = 'question-card';
+                // Añadimos la función toggleSelection al evento onchange
                 div.innerHTML = `
-                    <input type="checkbox" data-id="${q.id}" ${isChecked} onchange="update()">
+                    <input type="checkbox" data-id="${q.id}" ${isChecked} onchange="toggleSelection(${q.id}, this.checked)">
                     <div class="q-body">
                         <span class="tag">${q.theme}</span>
                         <span class="q-title">${q.text}</span>
@@ -136,16 +135,28 @@
                 `;
                 list.appendChild(div);
             });
-            update();
+            updateCounter();
         }
-
+        // Nueva función que añade o quita IDs de la memoria al hacer clic
+        function toggleSelection(id, isChecked) {
+            if (isChecked) {
+                selectedIds.add(id);
+            } else {
+                selectedIds.delete(id);
+            }
+            updateCounter();
+        }
         function update() {
             document.getElementById('selCount').innerText = document.querySelectorAll('input:checked').length;
+        }function updateCounter() {
+            document.getElementById('selCount').innerText = selectedIds.size;
         }
 
         function bulk(v) {
-            document.querySelectorAll('#list input[type="checkbox"]').forEach(i => i.checked = v);
-            update();
+            document.querySelectorAll('#list input[type="checkbox"]').forEach(i => {
+                i.checked = v;
+                toggleSelection(parseInt(i.dataset.id), v);
+            });
         }
 
         function parseCSVRow(str) {
@@ -209,9 +220,11 @@
         }
 
         function exportCuestionario() {
-            const selected = Array.from(document.querySelectorAll('input:checked')).map(i => parseInt(i.dataset.id));
-            const qs = questions.filter(q => selected.includes(q.id));
-            if(!qs.length) return alert("Selecciona preguntas para el cuestionario");
+            // Comprobamos si hay elementos en nuestra memoria global
+            if(selectedIds.size === 0) return alert("Selecciona preguntas para el cuestionario");
+
+            // Filtramos las preguntas buscando sus IDs en la memoria global
+            const qs = questions.filter(q => selectedIds.has(q.id));
 
             let out = "Question #,Question Text,Answer 1,Answer 2,\"Answer 3\n(Optional)\",\"Answer 4\n(Optional)\",\"Time Limit (sec)\n(Max: 300 seconds)\",\"Correct Answer(s)\n(Only include Answer #)\"\n";
             qs.forEach((q, i) => {
@@ -228,7 +241,6 @@
             a.download = "Blooket_Cuestionario_Clase.csv";
             a.click();
         }
-
         initThemes(); render();
     </script>
 </body>
